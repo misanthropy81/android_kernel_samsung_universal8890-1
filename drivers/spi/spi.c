@@ -1046,6 +1046,10 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
 			"failed to transfer one message from queue\n");
 		return;
 	}
+	mutex_unlock(&master->bus_lock_mutex);
+
+	/* Prod the scheduler in case transfer_one() was busy waiting */
+	cond_resched();
 }
 
 /**
