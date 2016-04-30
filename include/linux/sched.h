@@ -1183,8 +1183,11 @@ struct sched_avg {
  * computational need to do so. Not promoting services to big CPUs on launch
  * will prevent that unless a service allocates their per-cpu resources after
  * a period of intense computation, which is not a common pattern.
+ *
+ * Also avoid boosting background Android apps(oom_adj >= 5)
+ * 5 oom_adj is equals to 294 oom_score_adj
  */
-#define hmp_task_should_forkboost(task) ((task->parent && task->parent->pid > 2))
+#define hmp_task_should_forkboost(task) ((task->parent && task->parent->pid > 2 && task->signal->oom_score_adj < 294))
 #endif
 
 #ifdef CONFIG_SCHEDSTATS
