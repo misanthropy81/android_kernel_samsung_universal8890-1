@@ -1,9 +1,12 @@
 #!/bin/bash
 # Jesse kernel build script v0.2
 
-BUILD_COMMAND=$1
+MODEL=$1
 
-MODEL=hero2lte
+if [ x$1 = x ]
+then MODEL=hero2lte
+fi
+
 VARIANT=xx
 ARCH=arm64
 
@@ -20,7 +23,11 @@ BUILD_JOB_NUMBER=`grep processor /proc/cpuinfo|wc -l`
 mkdir -p bin
 ln -sf /usr/bin/python2.7 ./bin/python
 export PATH=$(pwd)/bin:$PATH
-KERNEL_DEFCONFIG=exynos8890-${MODEL}_jesse_defconfig
+KERNEL_DEFCONFIG=exynos8890-jesse_defconfig
+
+if [ $MODEL != hero2lte ]
+then MODEL_DEFCONFIG=exynos8890-"$MODEL"_defconfig
+fi
 
 KERNEL_IMG=$BUILD_KERNEL_OUT_DIR/arch/arm64/boot/Image
 DTC=$BUILD_KERNEL_OUT_DIR/scripts/dtc/dtc
@@ -98,7 +105,7 @@ FUNC_BUILD_DTIMAGE_TARGET()
 
 	chmod a+r $INSTALLED_DTIMAGE_TARGET
 
-	cp $INSTALLED_DTIMAGE_TARGET $BUILD_KERNEL_DIR/output/
+	cp $INSTALLED_DTIMAGE_TARGET $BUILD_KERNEL_DIR/output/dt-$MODEL.img
 
 	echo ""
 	echo "================================="
@@ -114,24 +121,37 @@ FUNC_BUILD_KERNEL()
         echo "START : FUNC_BUILD_KERNEL"
         echo "=============================================="
         echo ""
-        echo "build project="$PROJECT_NAME""
+        echo "build model="$MODEL""
         echo "build common config="$KERNEL_DEFCONFIG ""
+	echo "build model config="$MODEL_DEFCONFIG ""
 
 	mkdir $BUILD_KERNEL_DIR/output
-	rm $BUILD_KERNEL_DIR/output/Image $KERNEL_IMG
+	rm $KERNEL_IMG
 	rm $BUILD_KERNEL_OUT_DIR/firmware/apm_8890_evt1.h
 	ln -s $BUILD_KERNEL_DIR/firmware/apm_8890_evt1.h $BUILD_KERNEL_OUT_DIR/firmware/apm_8890_evt1.h
 	rm $BUILD_KERNEL_OUT_DIR/init/vmm.elf
 	ln -s $BUILD_KERNEL_DIR/init/vmm.elf $BUILD_KERNEL_OUT_DIR/init/vmm.elf
+
+if [ $MODEL != hero2lte ]
+then
+	cp -f $BUILD_KERNEL_DIR/arch/arm64/configs/$KERNEL_DEFCONFIG /tmp/tmp_defconfig
+	cat $BUILD_KERNEL_DIR/arch/arm64/configs/$MODEL_DEFCONFIG >> /tmp/tmp_defconfig
+
+	make -C $BUILD_KERNEL_DIR O=$BUILD_KERNEL_OUT_DIR -j$BUILD_JOB_NUMBER ARCH=arm64 \
+			CROSS_COMPILE=$BUILD_CROSS_COMPILE \
+			tmp_defconfig || exit -1
+else
 	make -C $BUILD_KERNEL_DIR O=$BUILD_KERNEL_OUT_DIR -j$BUILD_JOB_NUMBER ARCH=arm64 \
 			CROSS_COMPILE=$BUILD_CROSS_COMPILE \
 			$KERNEL_DEFCONFIG || exit -1
 
 	cp $BUILD_KERNEL_OUT_DIR/.config $BUILD_KERNEL_DIR/arch/arm64/configs/$KERNEL_DEFCONFIG
+fi
+
 	make -C $BUILD_KERNEL_DIR O=$BUILD_KERNEL_OUT_DIR -j$BUILD_JOB_NUMBER ARCH=arm64 \
 			CROSS_COMPILE=$BUILD_CROSS_COMPILE || exit -1
 
-	cp $KERNEL_IMG $BUILD_KERNEL_DIR/output/
+	cp $KERNEL_IMG $BUILD_KERNEL_DIR/output/Image-$MODEL
 	
 	echo ""
 	echo "================================="
