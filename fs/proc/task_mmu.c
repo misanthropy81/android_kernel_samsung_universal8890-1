@@ -264,7 +264,7 @@ static int proc_maps_open(struct inode *inode, struct file *file,
 		return -ENOMEM;
 
 	priv->inode = inode;
-	priv->mm = proc_mem_open(inode, PTRACE_MODE_READ);
+	priv->mm = proc_mem_open(inode, PTRACE_MODE_READ_FSCREDS);
 	if (IS_ERR(priv->mm)) {
 		int err = PTR_ERR(priv->mm);
 
@@ -812,7 +812,7 @@ static int proc_pid_smaps_simple_show(struct seq_file *m, void *v)
 		goto error_task;
 	}
 
-	mm = mm_access(task, PTRACE_MODE_READ);
+	mm = mm_access(task, PTRACE_MODE_READ_FSCREDS);
 	if (!mm || IS_ERR(mm)) {
 		ret = -2;
 		goto error_mm;
@@ -1415,7 +1415,7 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 	if (!pm.buffer)
 		goto out_task;
 
-	mm = mm_access(task, PTRACE_MODE_READ);
+	mm = mm_access(task, PTRACE_MODE_READ_FSCREDS);
 	ret = PTR_ERR(mm);
 	if (!mm || IS_ERR(mm))
 		goto out_free;
