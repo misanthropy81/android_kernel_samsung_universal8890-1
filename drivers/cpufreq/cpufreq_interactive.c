@@ -32,6 +32,7 @@
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <linux/pm_qos.h>
+#include <linux/screen_state.h>
 
 #ifdef CONFIG_ARM_EXYNOS_MP_CPUFREQ
 #include <soc/samsung/cpufreq.h>
@@ -259,7 +260,12 @@ static void cpufreq_interactive_timer_resched(
 				  tunables->io_is_busy);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
-	expires = jiffies + tunables->timer_rate;
+	expires = jiffies;
+	if (screen_off()) {
+		expires += (tunables->timer_rate * 3);
+	} else {
+		expires += tunables->timer_rate;
+	}
 	mod_timer_pinned(&pcpu->cpu_timer, expires);
 
 	if (tunables->timer_slack_val >= 0 &&
@@ -279,8 +285,14 @@ static void cpufreq_interactive_timer_start(
 	struct cpufreq_interactive_tunables *tunables, int cpu)
 {
 	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
-	unsigned long expires = jiffies + tunables->timer_rate;
+	unsigned long expires = jiffies;
 	unsigned long flags;
+
+	if (screen_off()) {
+		expires += (tunables->timer_rate * 3);
+	} else {
+		expires += tunables->timer_rate;
+	}
 
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
