@@ -143,7 +143,7 @@ int decon_set_par(struct fb_info *info)
 	struct decon_window_regs win_regs;
 	int win_no = win->index;
 
-	dev_info(decon->dev, "%s: state %d\n", __func__, decon->state);
+	dev_dbg(decon->dev, "%s: state %d\n", __func__, decon->state);
 
 	if ((decon->pdata->out_type == DECON_OUT_DSI &&
 			decon->state == DECON_STATE_INIT) ||
