@@ -854,6 +854,11 @@ enum cpu_idle_type {
  */
 #define SCHED_CAPACITY_SHIFT	10
 #define SCHED_CAPACITY_SCALE	(1L << SCHED_CAPACITY_SHIFT)
+/*
+ * Increase resolution of cpu_power calculations
+ */
+#define SCHED_POWER_SHIFT	10
+#define SCHED_POWER_SCALE	(1L << SCHED_POWER_SHIFT)
 
 /*
  * sched-domains (multiprocessor balancing) declarations:
@@ -1661,6 +1666,9 @@ struct task_struct {
 #if defined(CONFIG_BCACHE) || defined(CONFIG_BCACHE_MODULE)
 	unsigned int	sequential_io;
 	unsigned int	sequential_io_avg;
+#endif
+#ifdef CONFIG_SDP
+	unsigned int sensitive;
 #endif
 };
 
