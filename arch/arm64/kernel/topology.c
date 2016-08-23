@@ -19,6 +19,7 @@
 #include <linux/nodemask.h>
 #include <linux/of.h>
 #include <linux/sched.h>
+#include <linux/sched_energy.h>
 #include <linux/slab.h>
 
 #include <asm/cputype.h>
@@ -46,6 +47,24 @@ unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
 static void set_power_scale(unsigned int cpu, unsigned long power)
 {
 	per_cpu(cpu_scale, cpu) = power;
+}
+
+static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
+
+unsigned long scale_cpu_capacity(struct sched_domain *sd, int cpu)
+{
+#ifdef CONFIG_CPU_FREQ
+	unsigned long max_freq_scale = cpufreq_scale_max_freq_capacity(cpu);
+
+	return per_cpu(cpu_scale, cpu) * max_freq_scale >> SCHED_CAPACITY_SHIFT;
+#else
+	return per_cpu(cpu_scale, cpu);
+#endif
+}
+
+static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+{
+	per_cpu(cpu_scale, cpu) = capacity;
 }
 
 static int __init get_cpu_for_node(struct device_node *node)
@@ -358,9 +377,65 @@ static void update_cpu_power(unsigned int cpu)
 struct cpu_topology cpu_topology[NR_CPUS];
 EXPORT_SYMBOL_GPL(cpu_topology);
 
+/* sd energy functions */
+static inline
+const struct sched_group_energy * const cpu_cluster_energy(int cpu)
+{
+	struct sched_group_energy *sge = sge_array[cpu][SD_LEVEL1];
+
+	if (!sge) {
+		pr_warn("Invalid sched_group_energy for Cluster%d\n", cpu);
+		return NULL;
+	}
+
+	return sge;
+}
+
+static inline
+const struct sched_group_energy * const cpu_core_energy(int cpu)
+{
+	struct sched_group_energy *sge = sge_array[cpu][SD_LEVEL0];
+
+	if (!sge) {
+		pr_warn("Invalid sched_group_energy for CPU%d\n", cpu);
+		return NULL;
+	}
+
+	return sge;
+}
+
 const struct cpumask *cpu_coregroup_mask(int cpu)
 {
 	return &cpu_topology[cpu].core_sibling;
+}
+
+static inline int cpu_corepower_flags(void)
+{
+	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN | \
+	       SD_SHARE_CAP_STATES;
+}
+
+static struct sched_domain_topology_level arm64_topology[] = {
+#ifdef CONFIG_SCHED_MC
+	{ cpu_coregroup_mask, cpu_corepower_flags, cpu_core_energy, SD_INIT_NAME(MC) },
+#endif
+	{ cpu_cpu_mask, NULL, cpu_cluster_energy, SD_INIT_NAME(DIE) },
+	{ NULL, },
+};
+
+static void update_cpu_capacity(unsigned int cpu)
+{
+	unsigned long capacity = SCHED_CAPACITY_SCALE;
+
+	if (cpu_core_energy(cpu)) {
+		int max_cap_idx = cpu_core_energy(cpu)->nr_cap_states - 1;
+		capacity = cpu_core_energy(cpu)->cap_states[max_cap_idx].cap;
+	}
+
+	set_capacity_scale(cpu, capacity);
+
+	pr_info("CPU%d: update cpu_capacity %lu\n",
+		cpu, arch_scale_cpu_capacity(NULL, cpu));
 }
 
 static void update_siblings_masks(unsigned int cpuid)
@@ -469,6 +544,7 @@ void store_cpu_topology(unsigned int cpuid)
 	}
 
 	update_siblings_masks(cpuid);
+	update_cpu_capacity(cpuid);
 	update_cpu_power(cpuid);
 
 	pr_info("CPU%u: thread %d, cpu %d, cluster %d, mpidr %x\n",
@@ -514,7 +590,11 @@ void __init init_cpu_topology(void)
 	 */
 	if (parse_dt_topology())
 		reset_cpu_topology();
+	else
+		set_sched_topology(arm64_topology);
 
 	reset_cpu_power();
 	parse_dt_cpu_power();
+
+	init_sched_energy_costs();
 }

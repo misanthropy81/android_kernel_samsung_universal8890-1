@@ -403,7 +403,7 @@ static void fastcall_work_func(struct work_struct *work)
 #ifdef MC_FASTCALL_WORKER_THREAD
 		cpumask_t new_msk = mc_exec_core_switch(mc_fc_generic);
 
-		set_cpus_allowed(fastcall_thread, new_msk);
+		set_cpus_allowed_ptr(fastcall_thread, &new_msk);
 #else
 		mc_exec_core_switch(mc_fc_generic);
 #endif
@@ -475,7 +475,7 @@ int mc_fastcall_init(void)
 	}
 
 	/* this thread MUST run on CPU 0 at startup */
-	set_cpus_allowed(fastcall_thread, CPU_MASK_CPU0);
+	set_cpus_allowed_ptr(fastcall_thread, &CPU_MASK_CPU0);
 
 	wake_up_process(fastcall_thread);
 #ifdef TBASE_CORE_SWITCHER
